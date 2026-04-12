@@ -1,0 +1,8 @@
+"""
+Requirements for Secure File Storage System
+============================================
+Install with: pip install -r requirements.txt
+"""
+
+cryptography>=41.0.0
+pycryptodome>=3.18.0
