@@ -1,0 +1,156 @@
+ System Architecture (Layered View)
+
+    ┌──────────────────────────────────────────────┐
+    │          Secure File Storage System           │
+    ├──────────────────────────────────────────────┤
+    │                                              │
+    │  ┌────────────────────────────────────────┐  │
+    │  │        File Handler / Orchestrator      │  │
+    │  │  • End‑to‑end workflows                 │  │
+    │  │  • Binary file format                   │  │
+    │  │  • Tamper detection                     │  │
+    │  └──────────────▲─────────────────────────┘  │
+    │                 │                            │
+    │  ┌──────────────┴─────────────────────────┐  │
+    │  │            Hashing Module               │  │
+    │  │  • SHA‑256                              │  │
+    │  │  • Constant‑time compare                │  │
+    │  └──────────────▲─────────────────────────┘  │
+    │                 │                            │
+    │  ┌──────────────┴─────────────────────────┐  │
+    │  │            Signature Module             │  │
+    │  │  • RSA‑PKCS1v15                         │  │
+    │  │  • ECDSA                               │  │
+    │  └──────────────▲─────────────────────────┘  │
+    │                 │                            │
+    │  ┌──────────────┴─────────────────────────┐  │
+    │  │      Public Key Encryption Module       │  │
+    │  │  • RSA‑2048‑OAEP                        │  │
+    │  │  • Session key protection               │  │
+    │  └──────────────▲─────────────────────────┘  │
+    │                 │                            │
+    │  ┌──────────────┴─────────────────────────┐  │
+    │  │           Encryption Module             │  │
+    │  │  • AES‑256‑CBC                          │  │
+    │  │  • Random IV                           │  │
+    │  │  • PKCS7 padding                       │  │
+    │  └──────────────▲─────────────────────────┘  │
+    │                 │                            │
+    │  ┌──────────────┴─────────────────────────┐  │
+    │  │           Key Management                │  │
+    │  │  • RSA‑2048 / ECC P‑256                 │  │
+    │  │  • PEM storage                         │  │
+    │  └────────────────────────────────────────┘  │
+    └──────────────────────────────────────────────┘
+
+***
+
+## 2️⃣ Encryption Workflow (End‑to‑End View)
+
+    Plaintext File
+          │
+          ▼
+    ┌───────────────┐
+    │ SHA‑256 Hash  │
+    └───────▲───────┘
+            │
+    ┌───────┴─────────────┐
+    │ RSA‑PKCS1v15 Sign   │
+    └───────▲─────────────┘
+            │
+            │   Generate Random
+            │   AES‑256 Session Key
+            │               ┌─────────────┐
+            └──────────────▶│ AES Key     │
+                            └─────▲───────┘
+                                  │
+    ┌────────────────────────────────────────────┐
+    │ AES‑256‑CBC Encrypt                         │
+    │ (Plaintext || Digital Signature)           │
+    └───────────────┬────────────────────────────┘
+                    │
+            ┌───────▼────────┐   ┌────────────────────┐
+            │ Random IV       │   │ Ciphertext          │
+            └────────┬────────┘   └─────────┬──────────┘
+                     │                      │
+                     │      ┌───────────────┘
+                     ▼      ▼
+            ┌───────────────────────┐
+            │ RSA‑OAEP Encrypt AES  │
+            │ Session Key           │
+            └───────────▲───────────┘
+                        │
+               ┌────────▼────────┐
+               │ Encrypted AES   │
+               │ Session Key     │
+               └────────┬────────┘
+                        │
+    ┌────────────────────────────────────────────┐
+    │ Write Secure Package                        │
+    │ [IV | EncAESKey | Ciphertext]              │
+    └────────────────────────────────────────────┘
+                        │
+                        ▼
+                Encrypted File
+
+✅ **Security Properties Achieved**
+
+*   Confidentiality → AES‑256‑CBC
+*   Authentication → RSA Signature
+*   Integrity → SHA‑256 + Signature
+*   Key Protection → RSA‑OAEP
+
+***
+
+## 3️⃣ Decryption & Verification Workflow
+
+    Encrypted File
+          │
+          ▼
+    ┌─────────────────────────┐
+    │ Parse Secure Format     │
+    │ Extract:               │
+    │ • IV                   │
+    │ • Enc AES Key          │
+    │ • Ciphertext           │
+    └───────────▲─────────────┘
+                │
+    ┌───────────┴────────────────┐
+    │ RSA‑OAEP Decrypt AES Key   │
+    └───────────▲────────────────┘
+                │
+            AES Session Key
+                │
+    ┌───────────┴────────────────┐
+    │ AES‑256‑CBC Decrypt         │
+    │ Returns:                   │
+    │ (Plaintext || Signature)   │
+    └───────────▲────────────────┘
+                │
+          ┌─────┴─────┐
+          │           │
+    ┌─────▼─────┐ ┌───▼────────────┐
+    │ Plaintext │ │ Extract Signature│
+    └─────▲─────┘ └────▲────────────┘
+          │            │
+    ┌─────┴─────┐      │
+    │ SHA‑256   │      │
+    │ Hash      │      │
+    └─────▲─────┘      │
+          └───────┬────┘
+                  ▼
+    ┌─────────────────────────────┐
+    │ Verify Signature (PublicKey)│
+    └──────────────┬──────────────┘
+                   │
+         ┌─────────┴──────────┐
+         │                    │
+    ┌────▼─────┐        ┌─────▼─────┐
+    │ VALID    │        │ INVALID   │
+    │ Accept   │        │ Reject    │
+    │ Return PT│        │ Tampered  │
+    └──────────┘        └───────────┘
+
+***
+
+
