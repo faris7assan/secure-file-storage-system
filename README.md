@@ -1,131 +1,51 @@
-# Secure File Storage System Using Hybrid Cryptography
+# Secure File Storage System
 
-### Educational Cryptography & Secure File Handling Project
+## Hybrid Cryptography & Secure File Handling
 
-A Python implementation of a secure file-storage workflow demonstrating **hybrid cryptography**: symmetric encryption for file data, public-key encryption for session-key protection, digital signatures for authenticity, and SHA-256 hashing for integrity verification.
+Educational Python project demonstrating hybrid file encryption: symmetric encryption for file data, RSA-OAEP for session-key protection, SHA-256 hashing, and RSA-PSS signatures.
 
-> **Security note:** This is an educational/research project. It is not presented as production-ready cryptographic software. Review and harden the design before using it for real sensitive data.
+> Important: Educational/research software, not production cryptographic storage.
 
-## Security Design
+## Current construction
 
-```text
-Plaintext File
-      │
-      ├── SHA-256 ──→ File Hash ──→ RSA Signature
-      │
-      └── AES-256-CBC + Random Session Key
-                         │
-                         ▼
-                  Encrypted File
-                         │
-                  Session Key
-                         │
-                    RSA-OAEP
-                         │
-                         ▼
-               Receiver Public Key
-```
+~~~text
+File → SHA-256 → RSA-PSS Signature
+     └→ Random Session Key → AES-256-CBC
+                              └→ RSA-OAEP → Receiver Public Key
+~~~
 
-## Implemented Components
+## Cryptographic components
 
-- **AES-256-CBC** for file-data encryption
-- **Random per-file session keys**
-- **RSA-2048 + OAEP/SHA-256** for protecting session keys
-- **SHA-256** for file hashing
-- **RSA digital signatures** for authenticity and integrity verification
-- Modular key-management, encryption, signing, and file-handling components
+- AES-256-CBC for bulk encryption
+- Fresh random session key per file
+- RSA-2048 + OAEP/SHA-256 for key wrapping
+- SHA-256 for hashing
+- RSA-PSS for digital signatures
 
-## Important Cryptographic Consideration
+## Security limitation
 
-AES-CBC provides confidentiality but is **not an authenticated-encryption mode**. The project uses digital signatures to provide authenticity/integrity, but a production implementation should consider a modern AEAD construction such as **AES-GCM** and a carefully reviewed key-management design.
+AES-CBC is not authenticated encryption. The current design verifies a signature after decryption, but CBC should not be exposed through a production decryption service without careful oracle/error handling.
 
-The project itself identifies authenticated encryption and other hardening steps as future enhancements.
+A production-oriented next version should use AES-GCM or ChaCha20-Poly1305, version the file format, authenticate relevant metadata, and fail closed before writing unverified plaintext.
 
-## Encryption Workflow
+See SECURITY.md and docs/CRYPTO_REVIEW.md.
 
-1. Hash the plaintext file with SHA-256.
-2. Sign the hash with the sender's private key.
-3. Generate a fresh 256-bit session key.
-4. Encrypt the file data and signature using AES-256-CBC with a random IV.
-5. Encrypt the session key with the receiver's RSA public key using OAEP.
-6. Package the encrypted content, protected session key, IV, and signature.
+## Demonstration
 
-## Decryption Workflow
+The repository contains test fixtures for encryption/decryption, signatures, incorrect keys, tamper detection, and multiple file sizes. Use only synthetic/non-sensitive files.
 
-1. Parse the encrypted file structure.
-2. Recover the session key using the receiver's private RSA key.
-3. Decrypt the file using AES-256-CBC.
-4. Recompute the SHA-256 hash.
-5. Verify the digital signature with the sender's public key.
-6. Accept the file only when verification succeeds.
+## Future work
 
-## Project Structure
-
-```text
-├── hashing.py
-├── key_management.py
-├── encryption.py
-├── signature.py
-├── public_key_encryption.py
-├── file_handler.py
-└── main.py
-```
-
-## Installation
-
-### Requirements
-
-- Python 3.8+
-- `cryptography`
-- `pycryptodome`
-
-```bash
-pip install -r requirements.txt
-```
-
-## Usage
-
-The project includes examples for:
-
-- Encrypting and decrypting files
-- Generating sender/receiver key pairs
-- Verifying digital signatures
-- Detecting modified ciphertext/files
-- Testing incorrect receiver or sender keys
-
-Run the demonstration/test workflow with:
-
-```bash
-python main.py
-```
-
-## Test Scenarios
-
-The project includes demonstrations covering:
-
-- Valid encryption/decryption
-- Tampered-file detection
-- Wrong receiver key
-- Wrong sender verification key
-- Multiple file sizes
-
-## Future Improvements
-
-- [ ] Replace CBC-based construction with AES-GCM or another AEAD design
-- [ ] Streaming encryption for large files
-- [ ] Stronger key-management and rotation mechanisms
-- [ ] Multiple-recipient support
-- [ ] Hardware-backed key storage / HSM integration
-- [ ] Formal security review and threat modeling
+- [ ] AES-GCM/AEAD versioned file format
+- [ ] Streaming encryption
+- [ ] Key rotation and stronger key-management controls
+- [ ] Multiple recipients
+- [ ] Hardware-backed key storage
+- [ ] Formal security testing
 
 ## Author
 
-**Hassan Faris**  
-Cybersecurity Graduate | Network Security | Cryptography
+Hassan Faris — Cybersecurity Engineer | Network Security | Cryptography
 
 - GitHub: https://github.com/faris7assan
-- Portfolio: https://hassanhamedfaris69.base44.app/
-
-## License
-
-Educational / Research Purpose
+- LinkedIn: https://www.linkedin.com/in/hassan-faris
